@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class MoveManage : MonoBehaviour
+public class PlayerControl : MonoBehaviour
 {
     private Rigidbody2D rd;
 
@@ -14,6 +14,14 @@ public class MoveManage : MonoBehaviour
     /// 跳跃高度
     /// </summary>
     public float JumpForce;    // recommend range: 1500 - 10000
+
+    /// <summary>
+    /// 血量
+    /// </summary>
+    public int Hp = 5;
+
+
+    public CameraMove cameraScript;
 
     /// <summary>
     /// 是否在地面上
@@ -31,6 +39,12 @@ public class MoveManage : MonoBehaviour
     /// 方向
     /// </summary>
     private float directionNol;
+
+
+    private RaycastHit2D rayInfo;
+
+
+    private bool isDead;
 
     private void Awake()
     {
@@ -51,6 +65,9 @@ public class MoveManage : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (isDead)
+            return;
+
         AnimatorStateInfo aniStateInto = animator.GetCurrentAnimatorStateInfo(0);
         if (aniStateInto.IsName("AttackTree"))
         {
@@ -83,16 +100,18 @@ public class MoveManage : MonoBehaviour
             animator.SetFloat("AttackDir", directionNol);
             Ray2D ray = new Ray2D(transform.position, Vector2.right * directionNol);
 
-            RaycastHit2D rayInfo = Physics2D.Raycast(ray.origin, ray.direction,1);
-            Debug.LogError(rayInfo.distance);
+            rayInfo = Physics2D.Raycast(ray.origin, ray.direction,1);
+            //Debug.LogError(rayInfo.distance);
             if(rayInfo.transform != null && rayInfo.transform.tag == "Enemy")
             {
-
                 animator.SetFloat("AttackDis", rayInfo.distance);
+                if(rayInfo.distance < 1)
+                {
+                    Time.timeScale = 0;
+                }
             }
             else
             {
-
                 animator.SetFloat("AttackDis", 1f);
             }
 
@@ -112,6 +131,7 @@ public class MoveManage : MonoBehaviour
             rd.velocity = moveVelocity;
             animator.SetFloat("JumpDir", directionNol);
             MoveAnimation(moveVelocity.x, walkDirection.x);
+            //cameraScript.direction = walkDirection.x;
         }
 
 
@@ -125,11 +145,22 @@ public class MoveManage : MonoBehaviour
     private void MoveAnimation(float speed, float directionNor)
     {
         if (speed != 0)
+        {
             animator.SetFloat("Direction", directionNor);
+            cameraScript.direction = directionNor;
+        }
         animator.SetFloat("Speed", speed);
     }
 
-
+    /// <summary>
+    /// 动画结束重置状态
+    /// </summary>
+    public void AnimationEnd()
+    {
+        animator.SetBool("isAttack", false);
+        if(Time.timeScale == 0)
+            Time.timeScale = 1;
+    }
 
     void OnCollisionEnter2D(Collision2D collision)
     {
@@ -144,5 +175,33 @@ public class MoveManage : MonoBehaviour
     {
         //if (collision.gameObject.CompareTag("Ground"))
         //    isGrounded = false;
+    }
+
+
+    /// <summary>
+    /// 受伤
+    /// </summary>
+    public void Injured(int hurt)
+    {
+        Hp -= hurt;
+        if(Hp <= 0)
+        {
+            isDead = true;
+            transform.GetComponent<SpriteRenderer>().sprite = Resources.Load<Sprite>("PlayerDie");
+            animator.enabled = false;
+            Destroy(transform.GetComponent<Rigidbody2D>());
+            transform.position = new Vector3(transform.position.x, transform.position.y - 0.35f, transform.position.z);
+            Instantiate(Resources.Load("Prefabs/UI"), GameObject.Find("Canvas").transform);
+            Time.timeScale = 0;
+        }
+    }
+
+
+    public void Demage(int num)
+    {
+        if(rayInfo.transform!= null && rayInfo.transform.CompareTag("Enemy"))
+        {
+            rayInfo.transform.GetComponent<EnemyControl>().Injured(num);
+        }
     }
 }
